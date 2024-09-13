@@ -1,0 +1,28 @@
+Metadata-Version: 2.1
+Name: pyui
+Version: 0.1.0
+Summary: A simple Python UI library
+Home-page: https://github.com/yourusername/pyui
+Author: Stuart Yeadon
+Author-email: stuartyeadon@gmail.com
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: certifi==2024.2.2
+Requires-Dist: charset-normalizer==3.3.2
+Requires-Dist: contourpy==1.2.1
+Requires-Dist: cycler==0.12.1
+Requires-Dist: fonttools==4.51.0
+Requires-Dist: idna==3.7
+Requires-Dist: kiwisolver==1.4.5
+Requires-Dist: packaging==24.0
+Requires-Dist: pillow==10.3.0
+Requires-Dist: pycurl==7.45.2
+Requires-Dist: pyparsing==3.1.2
+Requires-Dist: python-dateutil==2.9.0.post0
+Requires-Dist: requests==2.31.0
+Requires-Dist: six==1.16.0
+Requires-Dist: urllib3==2.2.1

@@ -1,4 +1,3 @@
-
 class UIElement:
     def __init_subclass__(cls, UIName, **kargs) -> None:
         cls.UIName = UIName
@@ -8,10 +7,10 @@ class UIElement:
         self.content = content
 
     def __call__(self):
-        return self.render()
+        return self.export()
     
     def __repr__(self) -> str:
-        return self.render()
+        return self.export()
     
     """    
     @classmethod
@@ -20,9 +19,10 @@ class UIElement:
     """    
 
     def update(self, contents):
-        while  isinstance(self.content, UIElement):
+        while isinstance(self.content, UIElement):
             self = self.content
         self.content = contents
 
-    def render(self):
-        raise NotImplementedError('uielement: render() method required by uielements')
+    """All UIElements require a form of str output for a curses window to display"""
+    def export(self)->str:
+        raise NotImplementedError('uielement: export() method required by uielements')
