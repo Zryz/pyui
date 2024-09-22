@@ -41,8 +41,14 @@ class UIImage:
         if image_size[0] > window_size[1]:
             new_width = window_size[1]
             new_height = (new_width * image_size[1]) / image_size[0]
+        else: 
+            new_width = image_size[0]
+            new_height = image_size[1]
+            
         if new_height > window_size[0]:
             new_height = window_size[0]
             new_width = (new_height * image_size[0]) / image_size[1]
+
+            
         
         return int(new_width), int(new_height)
