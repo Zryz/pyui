@@ -1,8 +1,7 @@
 import curses, logging
 from .image import UIImage
 
-from ..common.colors import BODY_TEXT_COLOR, define_image_colors
-from ..common.defs import color_count
+from ..common.colours import BODY_TEXT_COLOR, define_image_colours, rgb_colour_pair
 
 from ..elements.title import Title
 from ..elements.menu import Menu
@@ -32,10 +31,8 @@ class Window:
         self.write_line: int = self.b_size+1
         self.write_end: int = self.height - self.b_size
 
-        """Fill the furthest bottom right cell with am empty string for consistent rendering
-        You cannot write to y[-1] x[-1] in curses as it generates a curses.err"""
-
-        self.window.addch(self.height-1, self.width-1," ", curses.color_pair(1))
+        #Add lower right window to pad window
+        self.window.addch(self.height, self.width-2," ", curses.color_pair(1))
 
         if self.b_size > 0:
             self.attach_border()
@@ -56,6 +53,21 @@ class Window:
         if self.b_size == 0: return
         self.b_size -= 1
 
+    def set_background(self, rgb, fg=curses.COLOR_BLACK):
+        self.rgb = rgb
+        self.fg = fg
+
+    def apply_properties(self, properties:dict, state:dict):
+        if not properties: return 0
+        for key, value in properties.items():
+            if key == 'bg':
+                state['color_total']+=1
+                self.apply_background(state, bg=value, fg=properties.get('fg'))
+    
+    def apply_background(self, state, bg, fg=None)->int:
+        if not fg: fg = curses.COLOR_BLACK
+        rgb_colour_pair(fg, bg, state)
+        self.window.bkgd(' ', curses.color_pair(state['color_total']))
 
     """Fill the furtherest bottom right cell with space for consistent rendering"""
     def fill_window(self):
@@ -80,66 +92,46 @@ class Window:
             
         return b_size
     
+    def title_color(self, color_int, rgb):
+            curses.init_color(color_int, int((rgb[0] / 255)*1000), int((rgb[1] / 255)*1000), int((rgb[2] / 255)*1000))
+            curses.init_pair(color_int, color_int, curses.COLOR_BLACK)
+    
     """The renderer will be fed a list of content to write to the windows
         These will need formatting to a str and applying the correct window writer techniques
         It also will handle the application of colours to use and keep track of how many pairs are added"""
     
-    def window_render(self, content_list, colour_count, write_line=None, x=None, colour_int=None):
-        self.logger.info("Content length is " + str(len(content_list)))
-        if not colour_int: colour_int = BODY_TEXT_COLOR
-        m = self.write_line
-        if colour_count == 16:
-            colour_count -= 1
+    def window_render(self, content_list:list, state:dict, write_line=None, x=None):
+        start_line = self.write_line
+        self.logger.info('Colour count ' + str(state['color_total']))
+
         for content in content_list:
-            if self.write_line != m: self.write_line += 4
+            if self.write_line != start_line: self.write_line += 2
             if isinstance(content, UIImage):
-                self.image_render(content)
+                self.image_writer(content)
                 continue
-            elif isinstance(content, (Title, Menu)):
-                setattr(content, 'width', self.width)
-                if isinstance(content, Title):
-                    #Apply the RGB colour values and register them in curses and set them as a pair
-                    if content.rgb != (255,255,255): 
-                        curses.init_color(colour_count+1, int((content.rgb[0] / 255)*1000), int((content.rgb[1] / 255)*1000), int((content.rgb[2] / 255)*1000))
-                        curses.init_pair(colour_count+1, colour_count+1, curses.COLOR_BLACK)
-                        #m = colour_int
-                        colour_int = colour_count+1
-                        colour_count+=1
-                    #We must set the y_center as a window flag for the content of title before it is burnt to a str
-                    if content.y_center: setattr(self, 'y_center', True)
-                #Export the Title into it's str
-                content = content.export()
-                #Now we can easily calculate how to vertically centre a title by reference to \n
-                if hasattr(self, 'y_center'): self.write_line = (self.height - content.count('\n'))//2
-                c_type = 'Title'
+            elif isinstance(content, Title):
+                #Set witdth and export title to str
+                self.title_writer(content, state)
+                continue
                 #We can easily y centre here by halving the total height - content lines
+            elif isinstance(content, Menu):
+                setattr(content, 'width', self.width)
+                content = content.export()
             elif isinstance(content, dict):
                 content = content.__repr__()
-                c_type = 'Dict'
-            elif isinstance(content, str):
-                c_type = 'Str'
-            else:
-                raise ValueError('Invalid type sent to writer - type sent ' + str(type(content)))
-            #Add a new line between content
-            self.writer(content, colour_int, c_type, colour_count, write_line, x)
+            if not isinstance(content, str):
+                raise ValueError('Invalid type sent to window writer, received: ' + str(type(content)))   
 
-        #if not isinstance(content, str):
-        #    raise TypeError('Invalid type provided to writer. Recieved type ', type(content))
-        return colour_count
+            self.writer(content, write_line, x)
 
+        self.window.noutrefresh()
 
     """Write content to the window via curses and applies any colours and formatting - returns the current colour count"""
-    def writer(self, content, colour_int:int, c_type, colour_count, write_line=None, x=None):
-        if write_line:
-            self.write_line = write_line
-        """Writer"""
-        #String iterator
-        i = 0 
-        #self.write_line = (self.height - content.count('\n'))//2
-
-        #x write co-ordinate
-        if not x:
-            x = 0 + self.x_pad
+    def writer(self, content, color_int=None, write_line=None, x=None):
+        if not color_int: color_int = 1 #Init to 1 when color not provided
+        if write_line: self.write_line = write_line 
+        if not x: x = 0 + self.x_pad 
+        i = 0  #Content iterator
 
         while self.write_line < self.write_end and i < len(content):
             #If the content is a new line adjust the write line and x accordingly
@@ -148,66 +140,89 @@ class Window:
                 x = 0 + self.x_pad
                 i+=1
                 continue
-            #If upcoming content overflows the width of the window or words can't be completed without getting chopped up
-            elif content[i:].count(' ') > 0 and content[i:].index(' ') > (self.width - x) and c_type != 'Title':
+            #Handle words that can't fit in remaining width
+            elif content[i:].count(' ') > 0 and content[i:].index(' ') > (self.width - x):
                 self.write_line +=1
                 x = 0 + self.x_pad
+            
+            if x >= self.width:
+                x = 0
+            try:
+                self.window.addstr(self.write_line, x, content[i], curses.color_pair(color_int))   
+            except curses.error as e:
+                self.logger.info(str(self.write_line) + ' ' + str(x) + ' ' + content[i] + ' ' + str(self.height) + ' ' + str(self.width))
 
-                """To cope with Title cropping we temporarily shift the write_line and x relative to i and recursively feed this to create a new line with ASCII fonts
-                    NOTE needs more refining as it chops off letters and only supports an extra line"""
-            elif x == self.width and c_type == 'Title':
+            x += 1
+            i += 1
+
+    def title_writer(self, title:Title, state:dict):
+        title.width = self.width
+        content = title.export()
+        if title.y_center: self.write_line = (self.height - content.count('\n'))//2
+        if hasattr(title, 'write_line'): self.write_line = title.write_line
+        if title.rgb != (255,255,255):
+            state['color_total'] += 1
+            self.title_color(state['color_total'], title.rgb)
+            color_int = state['color_total']
+        else:
+            color_int = 1
+        if not color_int: color_int = 1
+        x = 0 + self.x_pad
+        i = 0
+        while self.write_line < self.write_end and i < len(content):
+            if content[i] == '\n':
+                self.write_line +=1
+                x = 0 + self.x_pad
+                i+=1
+                continue
+            #Handle ASCII Title new line cropping when window width reached
+            if x == self.width:
                 if content[i:].count('\n') > 0:
                     l = i
                     m = self.write_line
                     lines = content.count('\n')
                     while content[i] != '\n':
-                        self.window_render([content[i]], colour_count, m+lines+2, i-l, colour_int)
+                        self.writer([content[i]], color_int, write_line=m+lines+2, x=(i-l))
                         i+=1
                     self.write_line = m
                     continue
                 else:
                     break
             try:
-                self.window.addstr(self.write_line, x, content[i], curses.color_pair(colour_int))
+                self.window.addstr(self.write_line, x, content[i], curses.color_pair(color_int))
             except curses.error as e:
-                pass
-                #print(self.write_line, x, self.height, self.width)
-            x += 1
-            i += 1
-            self.window.noutrefresh()
+                self.logger.info(self.logger.info(str(self.write_line) + ' ' + str(x) + ' ' + content[i] + ' ' + str(self.height) + ' ' + str(self.width)))
+            x+=1
+            i+=1
 
-
-    def image_render(self, image:UIImage):
+    def image_writer(self, image:UIImage):
         img = image.create_image((self.height, self.width))
         if not img: return
-        define_image_colors(image.colors)
-        
-        """Image reference co-ordinates"""
-        #Y co-ordinate for reference pixel in image
+        define_image_colours(image.colors)
         y = 0
-
-        """Window write co-ordinates"""
         #Set the image to the y-centre of the window and set this to starting value
-        self.write_line  = start = ((self.height - image.img.size[1])//2)+1
+        self.write_line = start = ((self.height - image.img.size[1])//2)+1
 
         #Check for a centre tag on the UIImage and shift to the middle of the page
         if image.center:
-            m = window_x = (self.width - image.width*2) // 2
+            m = window_x = max((self.width - image.width*2) // 2, 0)
         else:
             m = window_x = 0
-
-        #m = 0
         #Keep write line within starting place and image height, keep write line within window size (inlcuding bottom border) and keep y within size of image.height
         while self.write_line < start + image.height and self.write_line < self.write_end and y < image.height:
             window_x = m
             for x in range(image.width):
                 if window_x >= self.width:
+                    x = image.width
                     continue
                 pixel = image.img.getpixel((x, y))
+                #try:
                 self.window.addstr(self.write_line, window_x, "  ", curses.color_pair(pixel+17))
+                #except curses.error as e:
+                #    self.logger.info(str(window_x) + ' ' + str(x) + ' ' + str(y) + ' ' + str (self.height) + ' ' + str(self.width))
+                #    pass
                 window_x += 2
             self.write_line += 1
             y+=1
-        self.window.noutrefresh()
 
         

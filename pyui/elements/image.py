@@ -1,18 +1,10 @@
 import logging
 
 from PIL import Image
-from ..common.colors import extract_palette
+from ..common.colours import extract_palette
 
-"""A UIImage houses a PIL image with the correct 256 colours for use in a terminal environment
-    These self.colors can then be used to init curses colours when the image is called upon """
-
-def get_orientation(dimensions):
-        if dimensions[1] > dimensions[0]:
-            return 'landscape'
-        elif dimensions[1] == dimensions[0]:
-            return 'square'
-        else:
-            return 'portrait'
+""" UI Images are created with the raw image data and created during render call
+    Colours are set to 240 so that the terminal has 16 to use for text"""
 
 class UIImage:
     def __init__(self, image_file, center=False) -> None:
@@ -32,26 +24,20 @@ class UIImage:
         We give the creation a window_size and then calculate how best to fit the image
         Returns a boolean flag to indicate succesful creation"""
     def create_image(self, window_size)-> bool:
-        self.logger.info('Window size is ' + str(window_size))
-        if hasattr(self, 'empty'): return
+        if hasattr(self, 'empty'): return False
 
         img = Image.open(self.image_file)
         img = img.convert('P', palette=Image.ADAPTIVE, colors=240)
-        image_size = self.new_resize_to_window(img.size, window_size)
-        self.img = img.resize(image_size, Image.Resampling.LANCZOS)
+        image_size = self.scale_to_window(img.size, window_size)
 
+        self.img = img.resize(image_size, Image.Resampling.LANCZOS)
         self.height = self.img.height
         self.width = self.img.width
-        self.colors = extract_palette(self.img)
+        self.colors = extract_palette(self.img.getpalette())
 
         return True
 
-    """To fit images within a container we do the following:
-        Check if the images width is wider than the window - if so set the width the the window and scale a new height
-        Check if the new height is taller than the window and repeat the same process so that both dimensions fit
-        This approach naturally resolves square images"""
-    
-    def new_resize_to_window(self, image_size, window_size):
+    def scale_to_window(self, image_size, window_size):
         if image_size[0] > window_size[1]:
             new_width = window_size[1]
             new_height = (new_width * image_size[1]) / image_size[0]

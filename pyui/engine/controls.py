@@ -1,6 +1,11 @@
 from typing import Any, Dict, List
-
+from collections import defaultdict
 import curses
+
+KEYS = {'bs':263, 'up':259, 'left':curses.KEY_LEFT, 'right':curses.KEY_RIGHT, 'down':258, 'enter':'\\n', 'esc':'\x1b'}
+
+def nested_controls():
+    return defaultdict(nested_controls)
 
 class Controls:
     """
@@ -31,7 +36,6 @@ class Controls:
     self.quit_flag:: a switch to turn on / off the use of quit keys
 
     """
-    _KEYS = {'bs':263, 'up':259, 'left':curses.KEY_LEFT, 'right':curses.KEY_RIGHT, 'down':258, 'enter':'\\n', 'esc':'\x1b'}
     def __init__(self) -> None:
         """Controls have a control name to use as selection
             Within these you can specify a page_name for them to apply on"""
@@ -61,6 +65,7 @@ class Controls:
         curses.noecho()
         while key == -1:
             window = curses.newwin(1,1,0,0)
+            window.keypad(True)
             key = window.getch()
         return key
         #return chr(key).__repr__().replace("'", '')
@@ -76,8 +81,8 @@ class Controls:
         for page_name, value in controls.items():
             #We check if a key is included in the lookup table
             for key in list(value.keys()):
-                if len(key) > 1 and key in self._KEYS:
-                    r = self._KEYS[key]  
+                if len(key) > 1 and key in KEYS:
+                    r = KEYS[key]  
                 else:
                     r = ord(key)
                 controls[page_name][r] = controls[page_name].pop(key)
@@ -105,20 +110,20 @@ class Controls:
     """ Sets the active controls and inserts quit keys when self.quit_flag is on
         NOTE This will overwrite any existing binding using a quit key so be mindful"""
     def select(self, control_name):
-        #Check whether controls exist
-        #if control_name not in self.db: return
-        #Assign previous controls if active_controls exists:
-        if hasattr(self, 'active_controls'): self.prev_controls = self.active_controls
-        #Define them as the active_controls
         self.active_controls = self.db[control_name]
         #Check for use of quit keys and insert them into the current dicitionary
         if self.quit_flag and self.quit_keys:
             for key in self.quit_keys:
                 self.active_controls[ord(key)] = [[exit]]
+        if self.db.get('universal'):
+            for key, value in self.db['universal'].items():
+                self.active_controls[key] = value
 
     def attach_binding(self, control_name, key, *args):
-        if len(key) > 1: key = self._KEYS[key]
-        elif not isinstance(key, int): key = ord(key)
+        if not isinstance(key, int):
+            if len(key) > 1 and KEYS.get(key): key = KEYS[key]
+            else: key = ord(key)
+        
         if control_name not in self.db:
             self.db[control_name] = {}
         if key not in self.db[control_name]:

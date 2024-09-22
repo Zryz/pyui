@@ -5,17 +5,21 @@ from ..ascii.fonts import generate_ascii_letter
 #Titles are always centered with the option to feed in a font format.
 #Useful for banners and headings in pages
 class Title(UIElement, UIName='Title'):
-    def __init__(self, content:str, font_source=None, rgb=(255,255,255), x_center=True, y_centre=False) -> None:
+    def __init__(self, content:str, font_source=None, rgb=(255,255,255), x_center=True, y_centre=False, write_line=None) -> None:
         self.source = font_source
         self.rgb = rgb
         self.centre = x_center
         self.y_center = y_centre
-        
+        #Overide the window writer start line
+        if write_line: self.write_line = write_line
+
         if font_source != None:
             content = [{'ascii':[generate_ascii_letter(x, font_source) for x in content if generate_ascii_letter(x, font_source) != None]}] #'source':font_source}]
         else:
             content = [{'string':content.split('\n')}]
+        
         super().__init__(content)
+        self.width:int #set during render time relative to window size
 
     def __add__(self, other):
         if isinstance(other, Title):
@@ -38,12 +42,13 @@ class Title(UIElement, UIName='Title'):
         result = []
         for content in self.content:
             if content.get('ascii'):
-                #We have to generate ASCII art as part of the render process
                 #Create a holder for each line of the block art
                 maximum_height = max([len(i) for i in content['ascii']])
                 build_lines = ["" for _ in range(maximum_height)]
                 for letter in content['ascii']:
                     holder = ["" for _ in range(len(letter))]
+                    #Unsupported language / blank title content
+                    if not holder: return ''
                     for _ in range(len(letter)):
                         holder[_] += letter[_]
                 #Capital letters may have different heights to lower case,
@@ -52,7 +57,7 @@ class Title(UIElement, UIName='Title'):
                         holder.append(" "*len(holder[0]))
                     for a in range(len(holder)):
                         build_lines[a] += holder[a]
-                                
+
                 #Center the content to fit the page
                 if self.centre: final = [x.center(self.width-1) for x in build_lines]
                 else: final = [x for x in build_lines]
@@ -66,6 +71,5 @@ class Title(UIElement, UIName='Title'):
                 else:
                     final = [x for x in content['string']]
                     result.append('\n'.join(final))
-                #result.append('\n'.join([x.center(self.width-1) for x in content['string']]))
 
         return '\n'.join(result)

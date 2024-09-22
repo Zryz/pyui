@@ -66,13 +66,10 @@ class Page:
                     i+=1
         #Otherwise we make a fully extended window
             else:
-                self.log_info(i)
                 self.windows.append(Window(y_div_size, t_width, y_start, x_start, b_size[i], b_char))
                 i+=1
             y_start += y_div_size
-
-    def log_info(self, msg):
-        self.logger.info(msg)
+        self.logger.info('Page object ' + name + ' created succesfully')
 
     def reset_write_line(self):
         for window in self.windows:
@@ -83,8 +80,6 @@ class Page:
             raise ValueError('Page: x_pad length does not match - length given', len(x_pad), 'size needed', len(self.windows))
         for _ in range(len(self.windows)):
             self.windows[_].x_pad = x_pad[_]
-
-    #Pad out windows with initial " " post creation so that they always render fully
 
     #Return window instances that do not have a border and are not blocked from decoration
     def get_decorate_windows(self):

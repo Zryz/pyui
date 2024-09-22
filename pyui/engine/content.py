@@ -24,7 +24,10 @@ class Content:
         self.content_db[page_name] = {_:[] for _ in range(window_count)}
     
     def set(self, page_name, window_idx, content):
-        self.content_db[page_name][window_idx].append(content)
+        if isinstance(content, list):
+            self.content_db[page_name][window_idx] = self.content_db[page_name][window_idx] + content
+        else: 
+            self.content_db[page_name][window_idx].append(content)
 
     def add(self, page_name, window_idx, content):
         self.content_db[page_name][window_idx].append(content)

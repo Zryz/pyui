@@ -21,8 +21,7 @@ class Threader:
         return threading.Event()
     
     def new_thread(self, task:callable, *args)->threading.Thread:
-        thread = threading.Thread(target=task, args=(args), daemon=True)
-        return self.register_thread(thread, args)
+        return threading.Thread(target=task, args=(args), daemon=True)
     
     def reset_threads(self):
         if not self.stack:return
