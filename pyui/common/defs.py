@@ -16,8 +16,6 @@ TEXT_FORMAT = {
     'n':None
 }
 
-
-
 """Q is a reserved keyspace that applies to every page on the app and cannot be overwritten"""
 
 UNIVERSAL_CONTROLS = {'q':[[exit]], 'Q':[[exit]]}

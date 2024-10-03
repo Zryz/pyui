@@ -6,6 +6,8 @@ from ..common.colours import BODY_TEXT_COLOR, define_image_colours, rgb_colour_p
 from ..elements.title import Title
 from ..elements.menu import Menu
 
+from ..ascii.fonts import generate_ascii_letter, get_word_width, get_ascii_height, get_ascii_width
+
 """The Window class is an expanded wrapper to the curses window to provide more features and attributes.
     It houses a writer to apply content to the window to unify window drawing to one place"""
 
@@ -100,8 +102,9 @@ class Window:
         These will need formatting to a str and applying the correct window writer techniques
         It also will handle the application of colours to use and keep track of how many pairs are added"""
     
-    def window_render(self, content_list:list, state:dict, write_line=None, x=None):
+    def window_render(self, content_list:list, state:dict, write_line=None, x=None)->None:
         start_line = self.write_line
+
         self.logger.info('Colour count ' + str(state['color_total']))
 
         for content in content_list:
@@ -111,7 +114,8 @@ class Window:
                 continue
             elif isinstance(content, Title):
                 #Set witdth and export title to str
-                self.title_writer(content, state)
+                if not content.source: self.writer(content.content)
+                else: self.ascii_writer(content, state)
                 continue
                 #We can easily y centre here by halving the total height - content lines
             elif isinstance(content, Menu):
@@ -155,45 +159,54 @@ class Window:
             x += 1
             i += 1
 
-    def title_writer(self, title:Title, state:dict):
+    # Originall the Title class pre-built the entire ascii string but this became bloated and inefficient to manage
+    # To make over-wrapping easier I'm switching to a word by word generation and application system
+
+    def ascii_writer(self, title:Title, state:dict):
         title.width = self.width
-        content = title.export()
-        if title.y_center: self.write_line = (self.height - content.count('\n'))//2
+        #content = title.export()
+        #if title.y_center: self.write_line = (self.height - content.count('\n'))//2
+
         if hasattr(title, 'write_line'): self.write_line = title.write_line
+
         if title.rgb != (255,255,255):
             state['color_total'] += 1
             self.title_color(state['color_total'], title.rgb)
             color_int = state['color_total']
         else:
             color_int = 1
-        if not color_int: color_int = 1
+
         x = 0 + self.x_pad
-        i = 0
-        while self.write_line < self.write_end and i < len(content):
-            if content[i] == '\n':
-                self.write_line +=1
+        
+        ##TODO We need to move the ASCII to letter by letter for better word-wrapping behaviour
+
+        for word in title.words:
+            if x + get_word_width(word, title.source) > self.width:
                 x = 0 + self.x_pad
-                i+=1
-                continue
-            #Handle ASCII Title new line cropping when window width reached
-            if x == self.width:
-                if content[i:].count('\n') > 0:
-                    l = i
-                    m = self.write_line
-                    lines = content.count('\n')
-                    while content[i] != '\n':
-                        self.writer([content[i]], color_int, write_line=m+lines+2, x=(i-l))
+                self.write_line += get_ascii_height(title.source) + 1
+                if self.write_line >= self.write_end: return
+            for letter in word:
+                ascii = generate_ascii_letter(letter, title.source)
+                logging.info(ascii)
+                #if not ascii: continue
+                letter_width = get_ascii_width(letter, title.source)
+                i = 0
+                y = 0
+                char_x = 0
+                while self.write_line + y < self.write_end and i < len(ascii):
+                    if ascii[i] == '\n':
+                        y += 1
+                        char_x = 0
                         i+=1
-                    self.write_line = m
-                    continue
-                else:
-                    break
-            try:
-                self.window.addstr(self.write_line, x, content[i], curses.color_pair(color_int))
-            except curses.error as e:
-                self.logger.info(self.logger.info(str(self.write_line) + ' ' + str(x) + ' ' + content[i] + ' ' + str(self.height) + ' ' + str(self.width)))
-            x+=1
-            i+=1
+                        continue
+                    try:
+                        self.window.addstr(self.write_line + y, x + char_x, ascii[i], curses.color_pair(color_int))
+                    except curses.error as e:
+                        self.logger.info(self.logger.info(str(self.write_line) + ' ' + str(x) + ' ' + ascii[i] + ' ' + str(self.height) + ' ' + str(self.width)))
+                    char_x+=1
+                    i+=1
+                x += letter_width
+            x += 2
 
     def image_writer(self, image:UIImage):
         img = image.create_image((self.height, self.width))

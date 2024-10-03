@@ -3,6 +3,9 @@
 
 """
     Font Sources are a dictionary housing the various elements of a font.
+
+    Each library is a collection of Specials, Numeric, Upper and Lower characters from 0-9, a-z, A-Z etc... 
+
     You can specify a 'default_width' for all chars and overide them individually with 'widths'
     The functions can then use these to programatically build ASCII font characters
     
@@ -20,46 +23,54 @@ TOY_BLOCKS = {'special_chars':""" """,'special':{' ':'   \n   \n   \n   \n   \n 
  #Font typically have a common width, defined as default_width - outliers can be defined within the 'widths' indivdually. 
 
 def get_ascii_width(char, source):
-    if char not in source['widths']: width = source['default_width']
-    else: width = source['widths'][char]
+    char, library = determine_library(char, source)
+    content = source[library]
+    if char not in content['widths']: width = content['default_width']
+    else: width = content['widths'][char]
     return width
 
 def get_ascii_height(source):
-    return source['special'][' '].count('\n')
+    return source['special'][' '].count('\n')+1
+
+def get_word_width(word, source):
+    return sum([get_ascii_width(x, source) for x in word])
+
+def determine_library(char, source)->tuple:
+    # Determine from font source the nature of the character and ammend where needed
+    char_lower, has_lower, library = char.islower(), source.get('lower'), 'upper'
+    if char.isdigit(): library = 'numeric'
+    elif not has_lower and char_lower: char = char.upper()
+    elif has_lower and char_lower: library = 'lower'
+    return char, library
 
 #Special = Returned directly
 #Numeric = Generated (due to complexities of layers)
 #Alpha = Determine whether font supports given case and select correct library
 
-def generate_ascii_letter(char:str, source:str=None)->list:
+def generate_ascii_letter(char:str, source:str=None)->str:
     """Here we can write text and convert it into ASCII when a Font Source is provided"""
-    #if not source: return char #Immediately return the text if no font source provided
-    char_lower = char.islower()
-    has_lower = source.get('lower')
-    library = 'upper'
-    if char in source['special_chars']: return source['special'][char].split('\n') # Specials can be directly relayed as they are housed pre-built
-    elif char.isdigit(): library = 'numeric'
-    elif char.isalpha():
-        #If the character is a lowercase and the library doesn't support it - change both character and set library to upper
-        if not has_lower and char_lower: char = char.upper()
-        elif has_lower: library = 'lower'
-    else: return
+    
+    # Specials characters are store preformed and don't need programtic assembly
+    if char in source['special_chars']: return source['special'][char].split('\n')
 
-    ascii_height = source[library]['content'].count('\n')+1
-    width = get_ascii_width(char, source[library])
+    # Determine from font source the nature of the character and ammend where needed
+    char, library = determine_library(char, source)
 
+    # We need to set a content_index marker based on the relative positive away from the first character in the library
+    # We can iterate across the range from ord 0 -> ord (chr) where 65 would be 'A' - 97 -> 'a' etc...
+    # Then if we take the sum of this we get our content index
     if library == 'upper':
-        content_index = sum([get_ascii_width(chr(x), source[library])+source[library]['gap'] for x in range(65,ord(char))])
+        content_index = sum([get_ascii_width(chr(x), source) + source[library]['gap'] for x in range(65,ord(char))])
     elif library == 'lower':
-        content_index = sum([get_ascii_width(chr(x), source[library])+source[library]['gap'] for x in range(97,ord(char))])
+        content_index = sum([get_ascii_width(chr(x), source) + source[library]['gap'] for x in range(97,ord(char))])
     else:
-        content_index = sum([get_ascii_width(chr(x), source[library])+source[library]['gap'] for x in range(48,ord(char))])
+        content_index = sum([get_ascii_width(chr(x), source) + source[library]['gap'] for x in range(48,ord(char))])
     
+    # As the library houses A-Z, a-z e.g the total width is the first occurence of '\n' + 1
     total_width = source[library]['content'].index('\n')+1
-    
-    r = []
-    
-    for i in range(content_index,(total_width)*ascii_height, total_width):
-        r.append(source[library]['content'][i:i+width] + ' ' * source[library]['gap'])
-    
-    return r
+    # total_width * the count of '\n' which represents the height of the ASCII
+    net_total = total_width * get_ascii_height(source)
+
+    width = get_ascii_width(char, source)
+    # With these we can programatically generate an ASCII character
+    return '\n'.join([source[library]['content'][i:i+width] + ' ' * source[library]['gap'] for i in range(content_index, net_total, total_width)])

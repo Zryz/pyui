@@ -61,8 +61,8 @@ class Menu(UIElement, UIName='Menu'):
             title.width = self.width
             content = title.export()
             r += content
-            r += '\n' * content.count('\n')
-        else: r += self.title + '\n\n'
+            r += '\n\n'
+        else: r += self.title + '\n'
 
         for idx, val in enumerate(self.content.items()):
             ast = ''

@@ -1,6 +1,7 @@
 
 from .uielement import UIElement
-from ..ascii.fonts import generate_ascii_letter
+from ..ascii.fonts import generate_ascii_letter, get_ascii_width, get_ascii_height
+import curses
 
 #Titles are always centered with the option to feed in a font format.
 #Useful for banners and headings in pages
@@ -10,13 +11,10 @@ class Title(UIElement, UIName='Title'):
         self.rgb = rgb
         self.centre = x_center
         self.y_center = y_centre
-        #Overide the window writer start line
-        if write_line: self.write_line = write_line
+        self.words = content.split(' ')
 
-        if font_source != None:
-            content = [{'ascii':[generate_ascii_letter(x, font_source) for x in content if generate_ascii_letter(x, font_source) != None]}] #'source':font_source}]
-        else:
-            content = [{'string':content.split('\n')}]
+        #Overide the window writer start line to allow overlaying content
+        if write_line: self.write_line = write_line
         
         super().__init__(content)
         self.width:int #set during render time relative to window size
@@ -37,39 +35,43 @@ class Title(UIElement, UIName='Title'):
         elif isinstance(other, str):
             self.content.insert(0, {'string':other.split('\n')})
             return self
+        
+    def process_by_word(self, word):
+        pass
+
+    def apply_color(self, color_int):
+        pass
 
     def export(self)->str:
+        if self.centre: return self.content.center(self.width)
+        else: return self.content
+    
+    def old_export(self):
         result = []
-        for content in self.content:
-            if content.get('ascii'):
-                #Create a holder for each line of the block art
-                maximum_height = max([len(i) for i in content['ascii']])
-                build_lines = ["" for _ in range(maximum_height)]
-                for letter in content['ascii']:
-                    holder = ["" for _ in range(len(letter))]
+        if self.content.get('ascii'):
+            #Create a holder for each line of the block art
+            maximum_height = max([len(x) for i in self.content['ascii'] for x in i])
+            build_lines = ["" for _ in range(maximum_height)]
+
+            for word in self.content['ascii']:
+                words = []
+                for letter in word:
+                    lines = ["" for _ in range(len(letter))]
                     #Unsupported language / blank title content
-                    if not holder: return ''
+                    if not lines: return ''
                     for _ in range(len(letter)):
-                        holder[_] += letter[_]
-                #Capital letters may have different heights to lower case,
-                #For this we need to ammend the difference - usually due to hanging letters g, y etc.
-                    while len(holder) < maximum_height:
-                        holder.append(" "*len(holder[0]))
-                    for a in range(len(holder)):
-                        build_lines[a] += holder[a]
+                        lines[_] += letter[_]
+                    words = words + lines
 
-                #Center the content to fit the page
-                if self.centre: final = [x.center(self.width-1) for x in build_lines]
-                else: final = [x for x in build_lines]
+            #Capital letters may have different heights to lower case,
+            #For this we need to ammend the difference - usually due to hanging letters g, y etc.
+                while len(words) < maximum_height:
+                    words.append(" "*len(words[0]))
+                for a in range(len(words)):
+                    build_lines[a] += words[a]
 
-                result.append('\n'.join(final))
+            #Center the content to fit the page
+            if self.centre: final = [x.center(self.width-1) for x in build_lines]
+            else: final = [x for x in build_lines]
 
-            elif content.get('string'):
-                if self.centre: 
-                    final = [x.center(self.width-1) for x in content['string']]
-                    result.append('\n'.join(final))
-                else:
-                    final = [x for x in content['string']]
-                    result.append('\n'.join(final))
-
-        return '\n'.join(result)
+            result.append('\n'.join(final))
