@@ -29,6 +29,9 @@ def get_ascii_width(char, source):
     else: width = content['widths'][char]
     return width
 
+def get_space_width(source):
+    return source['special'][' '].index('\n')
+
 def get_ascii_height(source):
     return source['special'][' '].count('\n')+1
 

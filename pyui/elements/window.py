@@ -6,7 +6,7 @@ from ..common.colours import BODY_TEXT_COLOR, define_image_colours, rgb_colour_p
 from ..elements.title import Title
 from ..elements.menu import Menu
 
-from ..ascii.fonts import generate_ascii_letter, get_word_width, get_ascii_height, get_ascii_width
+from ..ascii.fonts import generate_ascii_letter, get_word_width, get_ascii_height, get_ascii_width, get_space_width
 
 """The Window class is an expanded wrapper to the curses window to provide more features and attributes.
     It houses a writer to apply content to the window to unify window drawing to one place"""
@@ -163,10 +163,16 @@ class Window:
     # To make over-wrapping easier I'm switching to a word by word generation and application system
 
     def ascii_writer(self, title:Title, state:dict):
-        title.width = self.width
+        # TODO Correctly calculate centring of font - will need to take into account widths between chars and what's already in library
+        total_width = sum([get_word_width(x, title.source) + get_space_width(title.source) for x in title.words])
+
+        if total_width < self.width:
+            x = (self.width - total_width) // 2
+        else:
+            x = 0 + self.x_pad
+
         #content = title.export()
         #if title.y_center: self.write_line = (self.height - content.count('\n'))//2
-
         if hasattr(title, 'write_line'): self.write_line = title.write_line
 
         if title.rgb != (255,255,255):
@@ -176,10 +182,6 @@ class Window:
         else:
             color_int = 1
 
-        x = 0 + self.x_pad
-        
-        ##TODO We need to move the ASCII to letter by letter for better word-wrapping behaviour
-
         for word in title.words:
             if x + get_word_width(word, title.source) > self.width:
                 x = 0 + self.x_pad
@@ -187,7 +189,7 @@ class Window:
                 if self.write_line >= self.write_end: return
             for letter in word:
                 ascii = generate_ascii_letter(letter, title.source)
-                logging.info(ascii)
+                #logging.info(ascii)
                 #if not ascii: continue
                 letter_width = get_ascii_width(letter, title.source)
                 i = 0
@@ -205,7 +207,7 @@ class Window:
                         self.logger.info(self.logger.info(str(self.write_line) + ' ' + str(x) + ' ' + ascii[i] + ' ' + str(self.height) + ' ' + str(self.width)))
                     char_x+=1
                     i+=1
-                x += letter_width
+                x += letter_width+1
             x += 2
 
     def image_writer(self, image:UIImage):

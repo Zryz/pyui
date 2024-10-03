@@ -7,16 +7,16 @@ class Menu(UIElement, UIName='Menu'):
     selected = None
     def __init__(self, title, content:dict, align='left', end="\n", display='all', title_font=None, text_font=None):
         self.values = [x for x in content.values()]
-        self.title = title
+
+        if title_font: self.title = Title(title, title_font)
+        else: self.title = title 
+
         self.end = end
         self.display = display
         self.align = align
 
         self.selected = -1 #Used to choose a menu item
 
-        self.title_font = title_font
-        self.text_font = text_font
-        
         super().__init__(content)
 
     def __add__(self, other):
